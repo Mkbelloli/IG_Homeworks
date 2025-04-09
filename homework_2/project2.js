@@ -3,9 +3,12 @@
 // The given rotation value is in degrees.
 function GetTransform( positionX, positionY, rotation, scale )
 {
-	angle =  -1 * rotation * Math.PI / 180
-	return Array(   scale * Math.cos(angle),   	- scale * Math.sin(angle), 	0, 
-	                scale* Math.sin(angle), 	scale * Math.cos(angle), 	0, 
+	// grad to rad
+	angle =  rotation * Math.PI / 180
+	
+	// scale + rotation + translation in 3x3 column-major
+	return Array(   scale * Math.cos(angle),   	scale * Math.sin(angle), 	0, 
+	                - scale* Math.sin(angle), 	scale * Math.cos(angle), 	0, 
 					positionX, 					positionY, 					1 );
 }
 
@@ -14,6 +17,8 @@ function GetTransform( positionX, positionY, rotation, scale )
 // The returned transformation first applies trans1 and then trans2.
 function ApplyTransform( trans1, trans2 )
 {
+	// trans2*trans1
+	// output[i][j] = Σ trans2[i][k] * trans1[k][j] => output[i+j*3] = Σ trans2[i+k*3] * trans1[k+j*3]
 	return Array( trans2[0]*trans1[0] + trans2[3]*trans1[1] + trans2[6]*trans1[2],
 					trans2[1]*trans1[0] + trans2[4]*trans1[1] + trans2[7]*trans1[2],
 					trans2[2]*trans1[0] + trans2[5]*trans1[1] + trans2[8]*trans1[2],
