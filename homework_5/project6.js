@@ -32,7 +32,10 @@ uniform Sphere spheres[ NUM_SPHERES ];
 uniform Light  lights [ NUM_LIGHTS  ];
 uniform samplerCube envMap;
 uniform int bounceLimit;
-float EPSILON = 1e-4;
+
+// Introduced to handle approximation
+float EPSILON_INTERSECT = 1e-4;  // for intersection	
+float EPSILON_SHADOW = 1e1;      // to identify shadow, t is much bigger and require a higher value
 
 bool IntersectRay( inout HitInfo hit, Ray ray );
 
@@ -49,12 +52,13 @@ vec3 Shade( Material mtl, vec3 position, vec3 normal, vec3 view )
 		float max_dist = length(position - lights[i].position);	
 		HitInfo h;
 		
-		if ( IntersectRay(h, light_ray) && (h.t < max_dist - EPSILON) ) {
+		if ( IntersectRay(h, light_ray) && (h.t < max_dist - EPSILON_SHADOW) ) {
 			// TO-DO: there is a shadow
-			//continue;
+			continue;
 		} 
 		
 		// TO-DO: If not shadowed, perform shading using the Blinn model
+		
 		// Diffuse term
 		float NdotL = max(dot(normal, -light_ray.dir), 0.0);
 		vec3 diffuse = mtl.k_d * lights[i].intensity * NdotL;
@@ -63,8 +67,7 @@ vec3 Shade( Material mtl, vec3 position, vec3 normal, vec3 view )
 		float NdotH = max(dot(normal, normalize(-light_ray.dir + view)), 0.0);
 		vec3 specular = pow(NdotH, mtl.n) * mtl.k_s * lights[i].intensity;
 
-		color += ( diffuse + specular );
-		//color += specular;
+		color = color + diffuse + specular;
 		//color += mtl.k_d * lights[i].intensity;	// change this line
 	}
 	return color;
@@ -79,24 +82,23 @@ bool IntersectRay( inout HitInfo hit, Ray ray )
 	hit.t = 1e30;
 	bool foundHit = false;
 	for ( int i=0; i<NUM_SPHERES; ++i ) {
+		
 		// TO-DO: Test for ray-sphere intersection
 		float a = dot(ray.dir, ray.dir);
 		float b = 2.0 * dot(ray.dir, ray.pos - spheres[i].center);
 		float c = dot(ray.pos - spheres[i].center, ray.pos - spheres[i].center) - (spheres[i].radius * spheres[i].radius);
 		float d = (b * b) - (4.0 * a * c);
 		
-		if (d<0.0) { continue;}
+		if (d<0.0) { continue;} // discr < 0 so no intersection
 		
 		float t = ( -b - sqrt(d) ) / ( 2.0 * a ); 
 		
-		if ( t < hit.t && t >= EPSILON){
+		if ( t < hit.t && t >= EPSILON_INTERSECT){
 			// TO-DO: If intersection is found, update the given HitInfo
 			hit.t = t;
 			hit.mtl = spheres[i].mtl;
 			hit.position = ray.pos + t * ray.dir;
 			hit.normal = normalize(hit.position - spheres[i].center);
-			if (dot(ray.dir, hit.normal) > 0.0)
-				hit.normal = - hit.normal;
 			foundHit = true;
 		}
 		
