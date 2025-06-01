@@ -35,7 +35,7 @@ uniform int bounceLimit;
 
 // Introduced to handle approximation
 float EPSILON_INTERSECT = 1e-4;  // for intersection	
-float EPSILON_SHADOW = 1e1;      // to identify shadow, t is much bigger and require a higher value
+float EPSILON_SHADOW = 1e0;      // to identify shadow, t is much bigger and require a higher value
 
 bool IntersectRay( inout HitInfo hit, Ray ray );
 
@@ -49,26 +49,28 @@ vec3 Shade( Material mtl, vec3 position, vec3 normal, vec3 view )
 		Ray light_ray;
 		light_ray.dir = normalize(position - lights[i].position);
 		light_ray.pos = lights[i].position;
-		float max_dist = length(position - lights[i].position);	
+		
+		float max_dist = length(lights[i].position - position);
 		HitInfo h;
 		
-		if ( IntersectRay(h, light_ray) && (h.t < max_dist - EPSILON_SHADOW) ) {
+		if ( IntersectRay(h, light_ray) && (h.t < (max_dist - EPSILON_SHADOW)) ) {
 			// TO-DO: there is a shadow
 			continue;
-		} 
+		} else {
 		
-		// TO-DO: If not shadowed, perform shading using the Blinn model
-		
-		// Diffuse term
-		float NdotL = max(dot(normal, -light_ray.dir), 0.0);
-		vec3 diffuse = mtl.k_d * lights[i].intensity * NdotL;
+			// TO-DO: If not shadowed, perform shading using the Blinn model
+			
+			// Diffuse term
+			float NdotL = max(dot(normal, -light_ray.dir), 0.0);
+			vec3 diffuse = mtl.k_d * lights[i].intensity * NdotL;
 
-		// Specular term
-		float NdotH = max(dot(normal, normalize(-light_ray.dir + view)), 0.0);
-		vec3 specular = pow(NdotH, mtl.n) * mtl.k_s * lights[i].intensity;
+			// Specular term
+			float NdotH = max(dot(normal, normalize(-light_ray.dir + view)), 0.0);
+			vec3 specular = pow(NdotH, mtl.n) * mtl.k_s * lights[i].intensity;
 
-		color = color + diffuse + specular;
-		//color += mtl.k_d * lights[i].intensity;	// change this line
+			color = color + diffuse + specular;
+			//color += mtl.k_d * lights[i].intensity;	// change this line
+		}
 	}
 	return color;
 }
@@ -130,12 +132,15 @@ vec4 RayTracer( Ray ray )
 			
 			if ( IntersectRay( h, r ) ) {
 				// TO-DO: Hit found, so shade the hit point
-				clr = Shade( h.mtl, h.position, h.normal, view );
+				vec3 clr_n = Shade( h.mtl, h.position, h.normal, view );
+				
 				// TO-DO: Update the loop variables for tracing the next reflection ray
 				ray = r;
-				view = normalize(ray.dir);
-				k_s = h.mtl.k_s;
+				view = normalize(-ray.dir);
+				k_s *= h.mtl.k_s;
 				hit = h;
+				clr += (k_s * clr_n);
+								
 			} else {
 				// The refleciton ray did not intersect with anything,
 				// so we are using the environment color
