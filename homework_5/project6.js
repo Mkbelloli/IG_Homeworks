@@ -35,7 +35,7 @@ uniform int bounceLimit;
 
 // Introduced to handle approximation
 float EPSILON_INTERSECT = 1e-4;  // for intersection	
-float EPSILON_SHADOW = 1e0;      // to identify shadow, t is much bigger and require a higher value
+float SHADOW_BIAS = 1e-2;  // bias for surface intersection
 
 bool IntersectRay( inout HitInfo hit, Ray ray );
 
@@ -46,14 +46,16 @@ vec3 Shade( Material mtl, vec3 position, vec3 normal, vec3 view )
 	for ( int i=0; i<NUM_LIGHTS; ++i ) {
 		
 		// TO-DO: Check for shadows
-		Ray light_ray;
-		light_ray.dir = normalize(position - lights[i].position);
-		light_ray.pos = lights[i].position;
 		
-		float max_dist = length(lights[i].position - position);
+		Ray shadow_ray;  // shadow_ray calculus
+		shadow_ray.dir = normalize(lights[i].position - position);
+		vec3 shadow_ray_position = position + shadow_ray.dir * SHADOW_BIAS;
+		shadow_ray.pos = shadow_ray_position;
+		
+		float max_dist = length(lights[i].position - shadow_ray_position);
 		HitInfo h;
 		
-		if ( IntersectRay(h, light_ray) && (h.t < (max_dist - EPSILON_SHADOW)) ) {
+		if ( IntersectRay(h, shadow_ray) && (h.t < max_dist) ) {
 			// TO-DO: there is a shadow
 			continue;
 		} else {
@@ -61,11 +63,11 @@ vec3 Shade( Material mtl, vec3 position, vec3 normal, vec3 view )
 			// TO-DO: If not shadowed, perform shading using the Blinn model
 			
 			// Diffuse term
-			float NdotL = max(dot(normal, -light_ray.dir), 0.0);
+			float NdotL = max(dot(normal, shadow_ray.dir), 0.0);
 			vec3 diffuse = mtl.k_d * lights[i].intensity * NdotL;
 
 			// Specular term
-			float NdotH = max(dot(normal, normalize(-light_ray.dir + view)), 0.0);
+			float NdotH = max(dot(normal, normalize(shadow_ray.dir + view)), 0.0);
 			vec3 specular = pow(NdotH, mtl.n) * mtl.k_s * lights[i].intensity;
 
 			color = color + diffuse + specular;
@@ -91,7 +93,7 @@ bool IntersectRay( inout HitInfo hit, Ray ray )
 		float c = dot(ray.pos - spheres[i].center, ray.pos - spheres[i].center) - (spheres[i].radius * spheres[i].radius);
 		float d = (b * b) - (4.0 * a * c);
 		
-		if (d<0.0) { continue;} // discr < 0 so no intersection
+		if ( d < 0.0 ) { continue;} // discr < 0 so no intersection
 		
 		float t = ( -b - sqrt(d) ) / ( 2.0 * a ); 
 		
@@ -127,7 +129,7 @@ vec4 RayTracer( Ray ray )
 			HitInfo h;	// reflection hit info
 			
 			// TO-DO: Initialize the reflection ray
-			r.dir = ray.dir - 2.0 * dot(ray.dir, hit.normal) * hit.normal;
+			r.dir = ray.dir - 2.0 * dot(ray.dir, hit.normal) * hit.normal; // ray.dir is toward the reflection point
 			r.pos = hit.position;
 			
 			if ( IntersectRay( h, r ) ) {
@@ -136,7 +138,7 @@ vec4 RayTracer( Ray ray )
 				
 				// TO-DO: Update the loop variables for tracing the next reflection ray
 				ray = r;
-				view = normalize(-ray.dir);
+				view = normalize(ray.dir); 
 				k_s *= h.mtl.k_s;
 				hit = h;
 				clr += (k_s * clr_n);
