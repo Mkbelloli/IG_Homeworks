@@ -275,34 +275,39 @@ function SimTimeStep( dt, positions, velocities, springs, stiffness, damping, pa
 	
 	// [TO-DO] Compute the total force of each particle
 	
-		// Add gravity
+	// Add Gravity
 	for (let i = 0; i < forces.length; i++) {
 		forces[i] = gravity.mul(particleMass);
 	}
 	
+	// Add Spring Forces
 	for (let i = 0; i < springs.length; i++) {
-		//console.log(position_m0);
+
 		var position_m0 = positions[springs[i].p0];
 		var position_m1 = positions[springs[i].p1];
+		
 		var velocity_m0 = velocities[springs[i].p0];
 		if (Number.isNaN(velocity_m0.x))
-			velocity_m0 = ToVec3([0,0,0]);
+			velocity_m0 = ToVec3([0,0,0]); // initialization
+		
 		var velocity_m1 = velocities[springs[i].p1];
 		if (Number.isNaN(velocity_m1.x))
-			velocity_m1 = ToVec3([0,0,0]);
+			velocity_m1 = ToVec3([0,0,0]); // initialization
 		
 		const length_s = position_m0.sub(position_m1).len();
-		var unit_d = position_m1.sub(position_m0).unit();
+		var unit_d = position_m1.sub(position_m0).div(length_s);
 		
 		// Spring force
 		var forceS = unit_d.mul( stiffness  * (length_s - springs[i].rest) );
 
 		// Dumping force
-		var forceD = unit_d.mul(damping * velocity_m1.sub(velocity_m0).dot(unit_d));	
+		var forceD = unit_d.mul( damping * velocity_m1.sub(velocity_m0).dot(unit_d) );	
 		
+		// update resulting forces 
 		forces[springs[i].p0] = forces[springs[i].p0].add(forceS);
 		forces[springs[i].p0] = forces[springs[i].p0].add(forceD);
-				
+		forces[springs[i].p1] = forces[springs[i].p1].sub(forceS);
+		forces[springs[i].p1] = forces[springs[i].p1].sub(forceD);
 	}
 	
 	
@@ -310,15 +315,25 @@ function SimTimeStep( dt, positions, velocities, springs, stiffness, damping, pa
 	for (let i = 0; i < forces.length; i++) {
 		
 		var acc_vec = forces[i].div(particleMass);
-		
 		if (Number.isNaN(velocities[i].x))
 			velocities[i] = ToVec3([0,0,0]);
+		
+		// Semi-implicit Euler Integration
 		velocities[i] = velocities[i].add(acc_vec.mul(dt));
 		positions[i] = positions[i].add(velocities[i].mul(dt));
 	}
 	
 	
 	// [TO-DO] Handle collisions
-	
+	var y0 = -1;
+	for (let i = 0; i < positions.length; i++) {
+		
+		if (positions[i].y - y0 < 0.0001)
+		{
+			// Collision identified
+			positions[i].y = (restitution * Math.abs(positions[i].y - y0) ) + y0; // bounced position
+			velocities[i].y = -1 * velocities[i].y * restitution;					// inverted velocity
+		}
+	}
 }
 
